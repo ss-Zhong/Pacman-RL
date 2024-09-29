@@ -2,9 +2,13 @@ import pacman_state, pacman_web
 import asyncio
 import random
 
-index_url = 'C:/Users/Zhong/Desktop/RLGaming/pacman/index.html' # index.html的全路径
+########################## Settings ##########################
+
+index_url = './pacman/index.html' # index.html的全路径
 # ports = [8765, 8766, 8767, 8768, 8769, 8770] # port list 多端口就多开
 ports = [8765]
+
+##############################################################
 
 key = [39, 40, 37, 38, 13] # 右 下 左 上 回车
 
