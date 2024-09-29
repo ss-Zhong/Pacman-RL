@@ -1,5 +1,5 @@
 """
-獲取游戲狀態
+获取游戏状态
 """
 
 import asyncio
@@ -10,10 +10,12 @@ import matplotlib
 import matplotlib.pyplot as plt
 import json
 import threading
+import torch
 
 matplotlib.use('TkAgg')
 
 from pacman_map import map_cfg
+key = [39, 40, 37, 38, 13]
 
 # WebSocket 服务器类
 class WebSocketServer():
@@ -53,7 +55,7 @@ class WebSocketServer():
         else:
             print("No active connections to send message.")
 
-# PACMAN游戏
+# 单个PACMAN游戏
 class PACMAN():
     def __init__(self, port = 8765):
 
@@ -66,7 +68,9 @@ class PACMAN():
         self.init_status()
 
         self.score_ = 0
+        self.reward = 0
         self.life = 5
+        self.done = True # 记录游戏是否开始，因为开始需要按一下enter
 
         self.map = self.init_map()
 
@@ -110,17 +114,22 @@ class PACMAN():
                 self.score_ += 1 
                 if self.map[self.pacman[0], self.pacman[1]] == 2: # 吃了超级豆
                     self.npc_status = np.where(self.npc_status == 1, 3, self.npc_status)
-                    print("self.npc_status", self.npc_status)
+                    # print("self.npc_status", self.npc_status)
                 
                 self.map[self.pacman[0], self.pacman[1]] = 0
+
+            # 没吃豆，走重复路
+            else:
+                self.reward -= 2
 
         elif data['type'] == 'npc':
             self.npc[data['id']] = [data['position']['y'], data['position']['x']]
 
         elif data['type'] == 'status':
-            print(f"port:{self.port} {data}")
+            # print(f"port:{self.port} {data}")
             self.npc_status[data['id']] = data['value']
 
+        # 有东西被吃了
         elif data['type'] == 'eat':
             # 吃豆人变强后吃掉怪物
             if self.npc_status[data['id']] == 3:
@@ -130,15 +139,19 @@ class PACMAN():
             # 吃豆人被吃
             elif self.npc_status[data['id']] == 1:
                 self.life -= 1
+                self.reward -= 50
                 if self.life == 0:
                     self.stage = 0
                     self.score_ = 0
                     self.life = 5
+                    self.done = True
                 
                 self.init_status()
 
+        # 通过一关
         elif data['type'] == 'nextStage':
             self.stage += 1
+            self.reward += 100
             self.init_map()
 
     async def display_game(self):
@@ -162,7 +175,7 @@ class PACMAN():
                 self.ax.scatter(npc_y, npc_x, color=npc_color, label=f'NPC {idx+1}', s=80, marker='h')
 
             # 显示得分和生命
-            self.ax.set_title(f'Score: {self.score_} | Lives: {self.life}', fontdict={'color': 'white', 'weight': 'bold', 'fontsize': 16})
+            self.ax.set_title(f'Score: {self.score_} | Lives: {self.life} | Reward: {self.reward}', fontdict={'color': 'white', 'weight': 'bold', 'fontsize': 16})
             
             # 强制绘图并暂停以更新
             plt.draw()
@@ -170,16 +183,33 @@ class PACMAN():
 
             await asyncio.sleep(0.1)  # 异步等待，以避免阻塞其他任务
 
-    def get_frame(self):
-        # frame[0] = self.map
-        pass
-
     async def start(self):
         await self.websocket.start_server(self.load_message)
 
-    async def key_press(self, key):
-        # key = [39, 40, 37, 38, 13] # 右 下 左 上 回车
-        await self.websocket.send_message_to_client({"keyCode": key})
+    # key = [39, 40, 37, 38, 13] 右 下 左 上 回车
+    # 输入Enter 开始游戏或继续游戏
+    async def enter(self):
+        await self.websocket.send_message_to_client({"keyCode": key[4]})
+        self.done = not self.done   # 改变游戏状态 暂停 <-> 继续
+
+    async def turn(self, direction):
+        assert (direction >= 0 and direction <= 3)
+        await self.websocket.send_message_to_client({"keyCode": key[direction]})
+
+    # 获取状态
+    def get_reward(self):
+        return self.score_ + self.reward
+    
+    def get_frame(self):
+        # 创建一个形状为 (2, height, width) 的 NumPy 数组
+        frame = np.array([self.map.copy(), np.zeros_like(self.map)], dtype=np.float32)
+
+        # 在图2中标上人物坐标和状态
+        frame[1][int(self.pacman[0]), int(self.pacman[1])] = 2
+        for status, npc in zip(self.npc_status, self.npc):
+            frame[1][npc[0], npc[1]] = status
+
+        return torch.tensor(frame)
 
     def get_possible_direction(self):
         dirc = []
@@ -199,6 +229,7 @@ class PACMAN():
         
         return dirc
 
+# 多PACMAN游戏
 class Multi_PACMAN():
     def __init__(self, ports = [8765]):
         self.pacmans = [PACMAN(port=port) for port in ports]
@@ -227,7 +258,3 @@ if __name__ == "__main__":
     ports = [8765] # 定义不同的端口
     pacmans = Multi_PACMAN(ports)
     pacmans.main()
-
-    # print(1)
-    # pacmans[0].key_press(1)
-

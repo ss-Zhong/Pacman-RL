@@ -10,32 +10,30 @@ ports = [8765]
 
 ##############################################################
 
-key = [39, 40, 37, 38, 13] # 右 下 左 上 回车
-
-async def robot(pacmans):
-    possible_direction = pacmans.pacmans[0].get_possible_direction()
+async def robot(env):
+    possible_direction = env.pacmans[0].get_possible_direction()
     
     direction = random.choice(possible_direction)
 
-    await pacmans.pacmans[0].key_press(key[direction])
+    await env.pacmans[0].turn(direction) # 0-3 右 下 左 上
     await asyncio.sleep(1)
 
 
 async def main():
-    pacmans = pacman_state.Multi_PACMAN(ports)
+    env = pacman_state.Multi_PACMAN(ports)
     # asyncio.to_thread(pacman_web.open_web, ports, zoom=0.5, index_url=index_url)
     
     task1 = asyncio.create_task(asyncio.to_thread(pacman_web.open_web, ports, zoom=0.5, index_url=index_url)) # web打开
-    task2 = asyncio.create_task(asyncio.to_thread(pacmans.run)) # 游戏记录打开
+    task2 = asyncio.create_task(asyncio.to_thread(env.run)) # 游戏记录打开
 
-    await asyncio.sleep(5)
-
+    await asyncio.sleep(2)
+    
     print("Both tasks are running concurrently, continuing with other code...")
     for i in range(len(ports)):
-        await pacmans.pacmans[i].key_press(key[4]) # 开局按 Enter
+        await env.pacmans[i].enter() # 开局按 Enter, enter可以开始、继续、暂停
 
     for i in range(100):
-        await robot(pacmans) # 对game1进行操作
+        await robot(env) # 对game1进行操作
     
     await asyncio.gather(task1, task2)
 

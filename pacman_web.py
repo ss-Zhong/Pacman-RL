@@ -6,13 +6,14 @@ import sys
 from PyQt5.QtWidgets import QApplication, QGridLayout, QWidget, QMainWindow, QDesktopWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
 from PyQt5.QtCore import QUrl
-from PyQt5.QtGui import QKeyEvent
-from PyQt5.QtCore import Qt
+
+CONSOLE = False # 是否输出网页输出
 
 # 覆蓋console.log函數
 class CustomWebEnginePage(QWebEnginePage):
     def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
-        print(f"\033[94m[console.log]({sourceID}, line: {lineNumber})\033[0m {message}")
+        if CONSOLE:
+            print(f"\033[94m[console.log]({sourceID}, line: {lineNumber})\033[0m {message}")
 
 # 创建主窗口
 class MultiBrowserWindow(QWidget):
