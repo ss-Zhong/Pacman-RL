@@ -19,7 +19,7 @@ python .\run.py
 
 ```bash
 cd Pacman-RL
-python .\train.py
+python .\train.py [-h] [--learning_rate LEARNING_RATE] [--batch_size BATCH_SIZE] [--num_workers NUM_WORKERS] [--url URL] [--gpu_id GPU_ID] [--unshow_windows]
 ```
 
 ## 开发

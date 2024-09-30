@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import threading
 import asyncio
+import numpy as np
 
 class ExperienceReplay:
     def __init__(self, max_size=10000):
@@ -61,42 +62,42 @@ class DQN(nn.Module):
         return cloned_model
 
 class Worker(threading.Thread):
-    def __init__(self, global_model, optimizer, env, args):
+    def __init__(self, global_model, optimizer, env, args, device, index):
         super(Worker, self).__init__()
         
         self.env = env
+        self.device = device
+        self.index = index
 
         self.optimizer = optimizer
-        self.global_model = global_model
-        self.local_model = self.global_model.clone()  # 克隆全局模型
+        self.global_model = global_model.to(self.device)
+        self.local_model = self.global_model.clone().to(self.device)  # 克隆全局模型
 
         self.args = args
         self.memory = ExperienceReplay()
         self.epsilon = 0.1      # 探索率
-
         self.step_total = 0
         self.update_local_frequency = 10
-
+        
     async def run(self):
         while True:
             # 若游戏未开始或结束，启动游戏
             if self.env.done == True:
-                # await asyncio.sleep(1)
+                await asyncio.sleep(1)
                 await self.env.enter()
-                utils.log_message(self.env.done)
+                utils.log_message(f"windows-{self.index} done ", self.env.done)
 
-            state = self.env.get_frame()
-            reward = self.env.get_reward()
+            state, reward = self.env.get_frame()
             
             while not self.env.done:
-
+                
                 action = self.act(state, self.env.get_possible_direction())  # 选择动作
 
                 await self.env.turn(action)
                 await asyncio.sleep(0.5)
 
-                next_state = self.env.get_frame()
-                reward = self.env.get_reward()
+                next_state, reward = self.env.get_frame()
+                utils.log_message("reward:", reward)
                 
                 # 存储经验
                 self.store_experience(state, action, reward, next_state, self.env.done)
@@ -112,6 +113,7 @@ class Worker(threading.Thread):
             return random.choice(dircs)  # 探索
         
         with torch.no_grad():
+            state = state.to(self.device)
             q_values = self.local_model.forward(state)  # 获取所有 Q 值
             # 过滤 Q 值，保留 dircs 中的索引
             filtered_q_values = [q_values[0][i].item() for i in dircs]
@@ -133,32 +135,34 @@ class Worker(threading.Thread):
         self.optimizer.step()
         self.update_epsilon()
 
-        if self.step_total % 100 == 0:
+        if self.step_total % 10 == 0:
             if self.step_total != 0:
                 self.step_total = 0
 
-            utils.log_message(f"Loss: {loss.item}, Epsilon: {self.epsilon}")
+            utils.log_message(f"Loss: {loss.item()}, Epsilon: {self.epsilon}")
 
     def update_local_model(self):
         self.local_model.load_state_dict(self.global_model.state_dict())
 
     def compute_loss(self, gamma=0.99):
         experiences = self.memory.sample(self.args.batch_size)
+        
         states, actions, rewards, next_states, dones = zip(*experiences)
 
-        states = torch.tensor(states, dtype=torch.float32)
-        actions = torch.tensor(actions, dtype=torch.long)
-        rewards = torch.tensor(rewards, dtype=torch.float32)
-        next_states = torch.tensor(next_states, dtype=torch.float32)
-        dones = torch.tensor(dones, dtype=torch.float32)
+        states = torch.FloatTensor(np.array(states)).to(self.device)
+        actions = torch.LongTensor(actions).unsqueeze(1).to(self.device)
+        rewards = torch.FloatTensor(rewards).to(self.device)
+        next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
+        dones = torch.FloatTensor(dones).to(self.device)
 
         # 计算 Q 值
-        current_q = self.global_model.forward(states).gather(1, actions.unsqueeze(1)).squeeze(1)
-        next_q = self.local_model.forward(next_states).max(1)[0].detach()  # 使用过去的，增强稳定性
-        target_q = rewards + (1 - dones) * gamma * next_q
+        q_values = self.global_model(states).gather(1, actions)
+
+        next_q_values = self.local_model(next_states).max(1)[0].detach()  # 使用过去的，增强稳定性
+        target_q_values = rewards + (1 - dones) * gamma * next_q_values
 
         # 计算损失
-        loss = F.mse_loss(current_q, target_q)
+        loss = F.mse_loss(q_values, target_q_values)
 
         return loss
     

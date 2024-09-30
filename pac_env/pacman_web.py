@@ -54,12 +54,16 @@ class MultiBrowserWindow(QWidget):
         self.setLayout(layout)
 
 # 使用方法
-def open_web(ports, zoom = 0.5, index_url='C:/Users/Zhong/Desktop/RLGaming/pacman/index.html'):
+def open_web(ports, zoom = 0.5, index_url='C:/Users/Zhong/Desktop/RLGaming/pacman/index.html', show = True):
     app = QApplication(sys.argv)
     
     # 创建主窗口并显示
     window = MultiBrowserWindow(ports, zoom, index_url)
-    window.show()
+
+    if show:
+        window.show()
+    else:
+        window.setVisible(False)
 
     sys.exit(app.exec_())
 

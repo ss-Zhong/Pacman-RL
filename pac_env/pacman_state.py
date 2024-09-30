@@ -25,7 +25,6 @@ class WebSocketServer():
 
     # 处理 WebSocket 消息并传递给回调函数
     async def handle_message(self, websocket, on_message_callback):
-        print("Client connected")
         self.active_connections = websocket
         try:
             async for message in websocket:
@@ -45,7 +44,7 @@ class WebSocketServer():
     # 启动 WebSocket 服务器
     async def start_server(self, on_message_callback):
         async with websockets.serve(lambda ws: self.handle_message(ws, on_message_callback), "localhost", self.port):
-            print(f"WebSocket server started on ws://localhost:{self.port}")
+            # print(f"WebSocket server started on ws://localhost:{self.port}")
             await asyncio.Future()  # 无限运行
 
     async def send_message_to_client(self, message):
@@ -70,6 +69,7 @@ class PACMAN():
 
         self.score_ = 0
         self.reward = 0
+        self.last_reward = 0
         self.life = 5
         self.done = True # 记录游戏是否开始，因为开始需要按一下enter
 
@@ -205,7 +205,7 @@ class PACMAN():
     # 获取状态
     # reward如何设计
     def get_reward(self):
-        return (self.score_ + self.reward) / 10
+        return self.score_ + self.reward
     
     def get_frame(self):
         # 创建一个形状为 (2, height, width) 的 NumPy 数组
@@ -216,7 +216,12 @@ class PACMAN():
         for status, npc in zip(self.npc_status, self.npc):
             frame[1][npc[0], npc[1]] = status
 
-        return torch.tensor(frame)
+        # 将差值作为reward
+        temp = self.get_reward()
+        reward = temp - self.last_reward
+        self.last_reward = temp
+
+        return torch.tensor(frame), reward
 
     def get_possible_direction(self):
         dirc = []
