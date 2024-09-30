@@ -11,7 +11,7 @@ python .\run.py
 
 实时获取游戏状态
 
-<img src="img/README/image-20240929170314022.png" alt="image-20240929170314022" style="zoom: 50%;" />
+<img src="Img/image-20240929170314022.png" alt="image-20240929170314022" style="zoom: 50%;" />
 
 ## 训练方法(未完成)
 
@@ -19,3 +19,20 @@ python .\run.py
 cd Pacman-RL
 python .\train.py
 ```
+
+## 开发
+
+### 关闭实时地图显示
+
+注释掉 pac_env\pacman_state.py 文件中的run_multiple_pacman()内的
+
+```python
+self.pacmans[0].display_game()
+```
+
+即可关闭实时地图显示
+
+### 修改浏览器console.log是否显示
+
+修改 pac_env\pacman_web.py 文件中的 ``CONSOLE``变量即可（True 输出，False 不输出）
+

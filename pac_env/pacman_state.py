@@ -14,7 +14,7 @@ import torch
 
 matplotlib.use('TkAgg')
 
-from pacman_map import map_cfg
+from .pacman_map import map_cfg
 key = [39, 40, 37, 38, 13]
 
 # WebSocket 服务器类

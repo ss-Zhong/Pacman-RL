@@ -3,7 +3,7 @@
 """
 
 import sys
-from PyQt5.QtWidgets import QApplication, QGridLayout, QWidget, QMainWindow, QDesktopWidget
+from PyQt5.QtWidgets import QApplication, QGridLayout, QWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
 from PyQt5.QtCore import QUrl
 

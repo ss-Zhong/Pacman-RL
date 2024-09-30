@@ -1,10 +1,10 @@
-import pacman_state, pacman_web
+from pac_env import pacman_state, pacman_web
 import asyncio
 import random
 
 ########################## Settings ##########################
 
-index_url = './pacman/index.html' # index.html的全路径
+index_url = './pac_env/pacman/index.html' # index.html的全路径
 # ports = [8765, 8766, 8767, 8768, 8769, 8770] # port list 多端口就多开
 ports = [8765]
 
@@ -26,7 +26,7 @@ async def main():
     task1 = asyncio.create_task(asyncio.to_thread(pacman_web.open_web, ports, zoom=0.5, index_url=index_url)) # web打开
     task2 = asyncio.create_task(asyncio.to_thread(env.run)) # 游戏记录打开
 
-    await asyncio.sleep(2)
+    await asyncio.sleep(5)
     
     print("Both tasks are running concurrently, continuing with other code...")
     for i in range(len(ports)):

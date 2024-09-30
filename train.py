@@ -1,5 +1,5 @@
 import agent
-import pacman_state, pacman_web
+from pac_env import pacman_state, pacman_web
 import torch
 import argparse
 import utils
@@ -11,7 +11,7 @@ def get_args():
     parser.add_argument('--learning_rate', type=float, default=1e-5, help='learning rate')
     parser.add_argument('--batch_size', type=int, default=128, help='batch size')
     parser.add_argument('--num_workers', type=int, default=1, help='num of workers')
-    parser.add_argument('--url', type=str, default='./pacman/index.html', help='the url of index')
+    parser.add_argument('--url', type=str, default='./pac_env/pacman/index.html', help='the url of index')
     return parser.parse_args()
 
 args = get_args()
