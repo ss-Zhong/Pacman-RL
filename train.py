@@ -29,9 +29,10 @@ async def main():
     global_model = agent.DQN()  # 定义 DQN 模型
     optimizer = torch.optim.Adam(global_model.parameters(), lr=args.learning_rate)
     env = pacman_state.Multi_PACMAN(ports)
+    memory = agent.ExperienceReplay()
 
     # 启动多个工作线程
-    workers = [agent.Worker(global_model, optimizer, env.pacmans[i], args, device, i) for i in range(args.num_workers)]
+    workers = [agent.Worker(global_model, optimizer, memory, env.pacmans[i], args, device, i) for i in range(args.num_workers)]
 
     task1 = asyncio.create_task(asyncio.to_thread(pacman_web.open_web, ports, zoom=0.5, index_url=args.url, show = args.unshow_windows)) # web打开
     task2 = asyncio.create_task(asyncio.to_thread(env.run)) # 游戏记录打开

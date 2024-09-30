@@ -7,19 +7,24 @@ import torch.nn.functional as F
 import threading
 import asyncio
 import numpy as np
+from threading import Lock
 
 class ExperienceReplay:
     def __init__(self, max_size=10000):
         self.memory = deque(maxlen=max_size)
+        self.lock = Lock()  # 创建锁
 
     def store(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done))
+        with self.lock:  # 加锁
+            self.memory.append((state, action, reward, next_state, done))
 
     def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
+        with self.lock:  # 加锁
+            return random.sample(self.memory, min(batch_size, len(self.memory)))
 
     def __len__(self):
-        return len(self.memory)
+        with self.lock:  # 加锁
+            return len(self.memory)
 
 class DQN(nn.Module):
     '''
@@ -62,7 +67,7 @@ class DQN(nn.Module):
         return cloned_model
 
 class Worker(threading.Thread):
-    def __init__(self, global_model, optimizer, env, args, device, index):
+    def __init__(self, global_model, optimizer, memory, env, args, device, index):
         super(Worker, self).__init__()
         
         self.env = env
@@ -74,7 +79,7 @@ class Worker(threading.Thread):
         self.local_model = self.global_model.clone().to(self.device)  # 克隆全局模型
 
         self.args = args
-        self.memory = ExperienceReplay()
+        self.memory = memory
         self.epsilon = 0.1      # 探索率
         self.step_total = 0
         self.update_local_frequency = 10
