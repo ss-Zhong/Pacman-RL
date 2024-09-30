@@ -62,6 +62,7 @@ class PACMAN():
         self.port = port
         self.stage = 0 # 第几关
         self.websocket = WebSocketServer(port)
+        self.direction = 37
 
         # 任务位置
         self.pacman, self.npc, self.npc_status = None, None, None
@@ -194,11 +195,17 @@ class PACMAN():
 
     async def turn(self, direction):
         assert (direction >= 0 and direction <= 3)
-        await self.websocket.send_message_to_client({"keyCode": key[direction]})
+        if self.direction == direction:
+            # 若当前方向没变，什么也不做
+            pass
+        else:
+            self.direction = direction
+            await self.websocket.send_message_to_client({"keyCode": key[direction]})
 
     # 获取状态
+    # reward如何设计
     def get_reward(self):
-        return self.score_ + self.reward
+        return (self.score_ + self.reward) / 10
     
     def get_frame(self):
         # 创建一个形状为 (2, height, width) 的 NumPy 数组
@@ -238,7 +245,7 @@ class Multi_PACMAN():
     # 定义一个运行多个 PACMAN 实例的函数        
     async def run_multiple_pacman(self):
         tasks = [
-            self.pacmans[0].display_game(),               # 异步展示游戏状态, 调试用, 不需要的时候可以注释掉, 关闭先关游戏窗口
+            # self.pacmans[0].display_game(),               # 异步展示游戏状态, 调试用, 不需要的时候可以注释掉, 关闭先关游戏窗口
             *[pacman.start() for pacman in self.pacmans]  # 异步运行游戏逻辑
         ]
         await asyncio.gather(*tasks)

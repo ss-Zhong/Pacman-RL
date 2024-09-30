@@ -9,8 +9,8 @@ import asyncio
 def get_args():
     parser = argparse.ArgumentParser(description='Parameters for Training Pacman Bot')
     parser.add_argument('--learning_rate', type=float, default=1e-5, help='learning rate')
-    parser.add_argument('--batch_size', type=int, default=128, help='batch size')
-    parser.add_argument('--num_workers', type=int, default=1, help='num of workers')
+    parser.add_argument('--batch_size', type=int, default=16, help='batch size')
+    parser.add_argument('--num_workers', type=int, default=16, help='num of workers')
     parser.add_argument('--url', type=str, default='./pac_env/pacman/index.html', help='the url of index')
     return parser.parse_args()
 
