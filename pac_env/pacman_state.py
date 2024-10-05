@@ -1,7 +1,7 @@
 """
 获取游戏状态
 """
-
+import copy
 import asyncio
 import websockets
 import json
@@ -113,6 +113,7 @@ class PACMAN():
             # 吃豆加分
             if self.map[self.pacman[0], self.pacman[1]]:
                 self.score_ += 1 
+                self.reward += 10
                 if self.map[self.pacman[0], self.pacman[1]] == 2: # 吃了超级豆
                     self.npc_status = np.where(self.npc_status == 1, 3, self.npc_status)
                     # print("self.npc_status", self.npc_status)
@@ -121,7 +122,7 @@ class PACMAN():
 
             # 没吃豆，走重复路
             else:
-                self.reward -= 2
+                self.reward -= 1
 
         elif data['type'] == 'npc':
             self.npc[data['id']] = [data['position']['y'], data['position']['x']]
@@ -136,11 +137,11 @@ class PACMAN():
             if self.npc_status[data['id']] == 3:
                 print("eat eat", data['id'])
                 self.npc_status[data['id']] = 4
-                self.score_ += 10
-            # 吃豆人被吃
+                self.score_ += 10# 吃豆人被吃
+                self.reward += 50
             elif self.npc_status[data['id']] == 1:
                 self.life -= 1
-                self.reward -= 50
+                self.reward -= 500
                 if self.life == 0:
                     self.stage = 0
                     self.score_ = 0
@@ -195,17 +196,43 @@ class PACMAN():
 
     async def turn(self, direction):
         assert (direction >= 0 and direction <= 3)
+        
+        # 轮询检测 pacman 位置变化
+        pre_pacman = copy.deepcopy(self.pacman)  # 获取 turn 之前的 pacman 位置
+
         if self.direction == direction:
             # 若当前方向没变，什么也不做
             pass
         else:
             self.direction = direction
-            await self.websocket.send_message_to_client({"keyCode": key[direction]})
+            await self.websocket.send_message_to_client({"keyCode": key[direction]})            
+        # 等待位置变化
+        while True:
+            # 短暂等待，让系统有时间更新
+            await asyncio.sleep(0.1)
+
+            # 如果 pacman 的位置变化了，则说明动作已执行完成
+            if self.pacman != pre_pacman:
+                break
 
     # 获取状态
     # reward如何设计
-    def get_reward(self):
-        return self.score_ + self.reward
+    def get_reward(self, pre_score, current_score, pre_life, current_life, stage):
+        temp = current_score - pre_score
+        if temp > 5:
+            reward = 50
+        elif temp > 0:
+            reward = 10
+        else:
+            reward = -1
+
+        if current_life < pre_life:
+            reward -= 500
+
+        if stage == 1 :
+            reward += 100
+            
+        return  reward
     
     def get_frame(self):
         # 创建一个形状为 (2, height, width) 的 NumPy 数组
@@ -216,24 +243,31 @@ class PACMAN():
         for status, npc in zip(self.npc_status, self.npc):
             frame[1][npc[0], npc[1]] = status
 
-        # 将差值作为reward
-        temp = self.get_reward()
-        reward = temp - self.last_reward
-        self.last_reward = temp
+        # # 将差值作为reward
+        # temp = self.get_reward()
+        # self.last_reward = self.reward
 
-        return torch.tensor(frame), reward
+        return torch.tensor(frame), copy.deepcopy(self.life), copy.deepcopy(self.score_)
 
     def get_possible_direction(self):
         dirc = []
         x, y = int(self.pacman[0]), int(self.pacman[1])
 
-        if self.map[x][y + 1] != -1:
+        if y < 27:
+            if self.map[x][y + 1] != -1:
+                dirc.append(0)
+        
+        if y == 27:
             dirc.append(0)
 
         if self.map[x+1, y] != -1:
             dirc.append(1)
 
-        if self.map[x, y-1] != -1:
+        if y > 0:
+            if self.map[x, y-1] != -1: 
+                dirc.append(2)
+        
+        if y == 0:
             dirc.append(2)
 
         if self.map[x-1, y] != -1:
