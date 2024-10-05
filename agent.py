@@ -1,4 +1,5 @@
 import torch
+import os
 import random
 import utils
 from collections import deque
@@ -85,24 +86,54 @@ class Worker(threading.Thread):
         self.update_local_frequency = 10
         
     async def run(self):
+        save_interval = 1000  # 保存模型的间隔，例如每1000步保存一次
+        update_count = 0      # 用于跟踪更新次数
+
         while True:
             # 若游戏未开始或结束，启动游戏
             if self.env.done == True:
                 await asyncio.sleep(1)
                 await self.env.enter()
                 utils.log_message(f"windows-{self.index} done ", self.env.done)
-
-            state, reward = self.env.get_frame()
+            
+            state, pre_life, pre_score= self.env.get_frame()
             
             while not self.env.done:
-                
                 action = self.act(state, self.env.get_possible_direction())  # 选择动作
-
                 await self.env.turn(action)
-                await asyncio.sleep(0.5)
+                next_state, current_life, current_score= self.env.get_frame()
+                reward = self.env.get_reward(pre_score, current_score, pre_life, current_life, self.env.stage)
+                # print("pre_npc: ", pre_npc)
+                # print("pre_pacman: ", pre_pacman)
+                # print("pre_score: ", pre_score)
+                # print("pre_life:", pre_life)
+                # print("current_npc:", current_npc)
+                # print("current_pacman:", current_pacman)
+                # print("current_score:", current_score)
+                # print("current_life", current_life)
 
-                next_state, reward = self.env.get_frame()
-                utils.log_message("reward:", reward)
+                # print("Reward: ", reward)
+                # pre_npc = current_npc
+                # pre_pacman = current_pacman
+                pre_life = current_life
+                pre_score = current_score
+                # i = 0
+                # while True:
+                #     next_state, reward, current_npc, current_pacman = self.env.get_frame()
+                #     print(i)
+                #     print("current_npc:", current_npc)
+                #     print("current_pacman:", current_pacman)
+                #     print("pre_npc: ", pre_npc)
+                #     print("pre_pacman: ", pre_pacman)
+                #     # 检查 NPC 位置是否发生变化
+                #     if self.has_npc_moved(pre_npc, current_npc):
+                #         pre_npc = current_npc  # 更新 NPC 位置
+                #         pre_pacman = current_pacman
+                #         print("hello")
+                #         break  # 检测到新帧，跳出循环
+                #     await asyncio.sleep(0.1)  # 等待状态稳定
+                #     i = i + 1
+                utils.log_message(f"Index: {self.index}, Reward: {reward}")
                 
                 # 存储经验
                 self.store_experience(state, action, reward, next_state, self.env.done)
@@ -111,8 +142,26 @@ class Worker(threading.Thread):
                     # 进行异步更新
                     await self.update_global_model()
 
-                state = next_state
+                    update_count += 1
+                    # 定期保存模型
+                    if update_count % save_interval == 0:
+                        await self.save_model(update_count=update_count)
 
+                state = next_state
+            print("Done")
+
+    async def save_model(self, update_count):
+        model_path = f"model_{self.index}_step_{update_count}.pth"
+        torch.save(self.global_model.state_dict(), model_path)
+        utils.log_message(f"Model saved at {model_path}")
+        print(f"Model saved at {os.path.abspath(model_path)}")
+
+    def has_npc_moved(self, pre_npc, current_npc):
+        for pre, current in zip(pre_npc, current_npc):
+            if pre != current:  # 如果任何一个NPC的坐标不相等
+                return True
+        return False
+    
     def act(self, state, dircs):
         if random.random() < self.epsilon:
             return random.choice(dircs)  # 探索
@@ -144,7 +193,7 @@ class Worker(threading.Thread):
             if self.step_total != 0:
                 self.step_total = 0
 
-            utils.log_message(f"Loss: {loss.item()}, Epsilon: {self.epsilon}")
+            utils.log_message(f"Index: {self.index}, Loss: {loss.item()}, Epsilon: {self.epsilon}")
 
     def update_local_model(self):
         self.local_model.load_state_dict(self.global_model.state_dict())
